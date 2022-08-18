@@ -6,40 +6,25 @@ logger = logging.getLogger(__name__)
 import math
 import os
 import time
-import math
-import asyncio
-import requests
 
+# the secret configuration specific things
 if bool(os.environ.get("WEBHOOK", False)):
     from sample_config import Config
 else:
     from config import Config
-
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
+# the Strings used for this "thing"
 from translation import Translation
 
 
-
-headers = {
-    "User-Agent":"Mozilla/5.0 (Windows NT 6.1; rv:80.0) Gecko/20100101 Firefox/80.0",
-    "Referer":"https://www.zee5.com",
-    "Accept":"*/*",
-    "Accept-Encoding":"gzip, deflate, br",
-    "Connection":"keep-alive",
-    "Accept-Language":"en-US,en;q=0.9",
-    "Origin":"https://www.zee5.com",
-    "sec-fetch-dest":"empty",
-    "sec-fetch-mode":"cors",
-    "sec-fetch-site":"same-site"
-}
-
-
-async def progress_for_pyrogram(
-    current,
-    total,
-    ud_type,
-    message,
-    start
-):
+async def progress_for_pyrogram(current, total, ud_type, message, start):
+    reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("🚫Cancel", callback_data = "closeme")
+                ]
+            ]
+        )
     now = time.time()
     diff = now - start
     if round(diff % 10.00) == 0 or current == total:
@@ -67,10 +52,7 @@ async def progress_for_pyrogram(
         )
         try:
             await message.edit(
-                text="{}\n {}".format(
-                    ud_type,
-                    tmp
-                )
+                text="{}\n {}".format(ud_type,tmp), reply_markup=reply_markup
             )
         except:
             pass
@@ -81,7 +63,7 @@ def humanbytes(size):
     # 2**10 = 1024
     if not size:
         return ""
-    power = 2**10
+    power = 2 ** 10
     n = 0
     Dic_powerN = {0: ' ', 1: 'Ki', 2: 'Mi', 3: 'Gi', 4: 'Ti'}
     while size > power:
@@ -96,67 +78,8 @@ def TimeFormatter(milliseconds: int) -> str:
     hours, minutes = divmod(minutes, 60)
     days, hours = divmod(hours, 24)
     tmp = ((str(days) + "d, ") if days else "") + \
-        ((str(hours) + "h, ") if hours else "") + \
-        ((str(minutes) + "m, ") if minutes else "") + \
-        ((str(seconds) + "s, ") if seconds else "") + \
-        ((str(milliseconds) + "ms, ") if milliseconds else "")
+          ((str(hours) + "h, ") if hours else "") + \
+          ((str(minutes) + "m, ") if minutes else "") + \
+          ((str(seconds) + "s, ") if seconds else "") + \
+          ((str(milliseconds) + "ms, ") if milliseconds else "")
     return tmp[:-2]
-
-
-async def take_screen_shot(video_file, output_directory, ttl):
-    out_put_file_name = output_directory + \
-        "/" + str(time.time()) + ".jpg"
-    file_genertor_command = [
-        "ffmpeg",
-        "-ss",
-        str(ttl),
-        "-i",
-        video_file,
-        "-vframes",
-        "1",
-        out_put_file_name
-    ]
-    # width = "90"
-    process = await asyncio.create_subprocess_exec(
-        *file_genertor_command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await process.communicate()
-    e_response = stderr.decode().strip()
-    t_response = stdout.decode().strip()
-    if os.path.lexists(out_put_file_name):
-        return out_put_file_name
-    else:
-        return None
-        
-
-def DownLoadFile(url, file_name, chunk_size, client, ud_type, message_id, chat_id):
-    if os.path.exists(file_name):
-        os.remove(file_name)
-    if not url:
-        return file_name
-    r = requests.get(url, allow_redirects=True, stream=True)
-    total_size = int(r.headers.get("content-length", 0))
-    downloaded_size = 0
-    with open(file_name, 'wb') as fd:
-        for chunk in r.iter_content(chunk_size=chunk_size):
-            if chunk:
-                fd.write(chunk)
-                downloaded_size += chunk_size
-            if client is not None:
-                if ((total_size // downloaded_size) % 5) == 0:
-                    time.sleep(0.3)
-                    try:
-                        client.edit_message_text(
-                            chat_id,
-                            message_id,
-                            text="{}: {} of {}".format(
-                                ud_type,
-                                humanbytes(downloaded_size),
-                                humanbytes(total_size)
-                            )
-                        )
-                    except:
-                        pass
-    return file_name
